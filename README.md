@@ -1,34 +1,24 @@
+# Household Debt Burden: Racialized Pathways and Wealth Disparities
 
-# DATA 712 Midterm Project - Roni Pitkowsky
-## Persistence of Racial Disparities in Debt Burden
+This repository contains the code and documentation for an analysis of high household debt burden (Payment-to-Income Ratio > 40%) using data from the **2022 Survey of Consumer Finances (SCF)**. 
 
-### Project Structure
+The analysis tests whether racial and wealth disparities in debt burden persist after controlling for socioeconomic characteristics, drawing on structural theories of financial vulnerability (e.g., Wherry's concept of "viral debt").
 
-- **manuscript/** - Paper files (Rmd, PDF, template)
-- **presentations/** - Presentation slides and visualizations
-- **data/** - Survey data and processed objects
-- **results/** - Cached analysis results (regression, bivariate)
-- **scripts/** - R scripts for data processing
-- **resources/** - Codebooks, reference PDFs
-- **references/** - Bibliographic files (.bib, .csl)
-- **archive/** - Old drafts and iterations
+## 📄 Project Outputs
 
-### Key Files
+This repository contains two distinct written outputs derived from the same underlying analysis:
 
-- `manuscript/paper.Rmd` - Main paper
-- `DATA 712 20260430 Roni Pitkowsky SCF.Rmd` - Analysis script
-- `data/scf_filtered.rds` - Processed SCF data
-- `references/references.bib` - Citations
+1. **Empirical Snapshot** (`HFWG 20260925 Emprical Snapshot.Rmd` / `.pdf`)  
+   A concise, one-page summary of the core findings, methodology, and policy implications. This is formatted for quick reading, highlighting the divergence between raw debt burden rates and adjusted odds ratios across racial and wealth groups.
 
-### Reproduction
+2. **Full Midterm Research Report** (`DATA 712 20260430 Roni Pitkowsky SCF.Rmd` / `.pdf`)  
+   The comprehensive research report. This document contains the full theoretical background, detailed methodological approach (including complex survey design handling), extensive bivariate cross-tabulations, multivariate logistic regression results, and an in-depth discussion of limitations and future research directions.
 
-1. Load data: `source('scripts/SCF_filter_load.R')`
-2. Run analysis: Open and knit `DATA 712 20260430 Roni Pitkowsky SCF.Rmd`
-3. Generate paper: Knit `manuscript/paper.Rmd`
+## 📂 Repository Structure
 
-### Data Source
-
-2022 Survey of Consumer Finances (SCF)
-Federal Reserve Board of Governors
-https://www.federalreserve.gov/econres/scfindex.htm
-
+```text
+├── HFWG 20260925 Emprical Snapshot.Rmd   # One-page summary source code
+├── DATA 712 20260430 Roni Pitkowsky SCF.Rmd # Full midterm report source code
+├── manuscript/                           # LaTeX/RMarkdown template files for formatting
+├── .gitignore                            # Excludes large data, cache, and draft files
+└── README.md                             # This file
