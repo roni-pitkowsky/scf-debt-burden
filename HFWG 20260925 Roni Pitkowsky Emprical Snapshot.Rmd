@@ -1,27 +1,26 @@
 ---
-title: "The Racialized Pathways of Household Debt Burden"
+title: "Racial Minorities Face Up to 178 Percent Higher Odds of High Household Debt Burden"
 author: "Roni Pitkowsky"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 
 snapshot: true
 snapshot_label: "Empirical Snapshot"
-snapshot_feature: "figures/presentation_race_plot.png"
+snapshot_feature: "figures/snapshot_race_plot.png"
 
 snapshot_byline_name: "Roni Pitkowsky"
 snapshot_byline_title: "Master’s Student of Data Analytics & Applied Social Research"
 snapshot_byline_affiliation: "Queens College, City University of New York"
 snapshot_byline_link: "https://commons.gc.cuny.edu/members/ronipitkowsky/"
-snapshot_byline_bio: "Master’s Student of Data Analytics & Applied Social Research"
 snapshot_author_image: "images/Roni_Pitkowsky_Headshot_Square.jpg"
 
 snapshot_switch_section: 3
 snapshot_license: "cc-by-nc-sa-4.0"
 snapshot_data_note:
   - "Data: Survey of Consumer Finances <jncohen.commons.gc.cuny.edu/scf>"
-snapshot_code_url: "https://github.com/roni-pitkowsky"
+snapshot_code_url: "github.com/roni-pitkowsky/HFWG 20260925 Emprical Snapshot.Rmd"
 
 abstract: |
-  Raw data suggests White households face the highest rates of debt burden, but controlling for wealth reveals that racial minorities face significantly higher adjusted odds of financial distress.
+  White households show the highest raw rates of debt burden. Adjusting for wealth reverses this: minority households face substantially higher odds of financial distress.
 
 fontset: hfwg
 accent: 0066CC
@@ -45,6 +44,8 @@ output:
 
 rm(list=ls())
 gc()
+
+hfwgtex::hfwg_use(overwrite = T)
 
 knitr::opts_knit$set(root.dir ="C:/Users/ronip/Documents/Queens College/2026 Spring/DATA 712/scf-debt-burden")
 
@@ -183,13 +184,11 @@ c("pir40", "age", "sex", "married_factor", "married", "married_detailed", "wealt
 ```
 
 
-While raw data suggests White households face the highest rates of debt burden, controlling for wealth and homeownership reveals that racial minorities face significantly higher odds of financial distress, highlighting structural barriers over individual deficits.
-
-Using data from the 2022 Survey of Consumer Finances (SCF), this snapshot examines the prevalence and predictors of high debt burden—defined as a Payment-to-Income Ratio (PIR) exceeding 40%. The findings reveal that high debt burden is not randomly distributed but is systematically concentrated among racial minorities and asset-poor households. Crucially, racial disparities remain significant even after extensive controls, suggesting that factors beyond individual socioeconomic status drive financial fragility.
+Raw data suggests White households face the highest debt burden rates, but controlling for wealth reveals a stark reversal. After adjusting for socioeconomic factors, Black, Hispanic, and Asian households face 74 to 178 percent higher odds of financial distress than White households. This reveals that structural barriers, rather than individual choices, drive debt concentration among asset-poor minority families.
 
 # Context
 
-Household debt in the United States has reached unprecedented levels, threatening financial stability and economic mobility. High debt service payments constrain households’ ability to weather economic shocks, exacerbating existing inequalities. Policy debates often focus on individual financial management or homeownership promotion. However, emerging scholarship on "viral debt" suggests that financial vulnerability is structurally produced, circulating through communities along pathways shaped by historical exclusion. This analysis tests whether racial and wealth disparities in debt burden persist after controlling for socioeconomic characteristics.
+This analysis uses the 2022 Survey of Consumer Finances (SCF), a triennial survey conducted by the Federal Reserve. The sample includes approximately 5,200 U.S. households, representing the civilian noninstitutionalized population. The primary outcome is high debt burden, defined as a Payment-to-Income Ratio (PIR) exceeding 40 percent, the Federal Reserve’s standard threshold for financial distress. Key predictors include race, wealth group, education, age, marital status, and homeownership. All estimates account for the complex survey design using replicate weights and multiple imputation. This associational analysis isolates the independent relationship between race and debt burden while holding measurable economic resources constant, testing whether disparities persist beyond compositional differences.
 
 # Findings
 
@@ -304,19 +303,21 @@ race_plot <- ggplot(race_plot_data, aes(x = Race, y = Value, fill = Measure)) +
   )
 
 # Save specifically for the snapshot layout
-ggsave("visualizations/snapshot_race_plot.png", 
+ggsave("figures/snapshot_race_plot.png", 
        race_plot, width = 7, height = 4.5, dpi = 300, bg = "white")
 ```
 
 
-The figure below depicts the divergence between raw debt burden rates and adjusted odds ratios across racial and wealth groups. Three observations stand out:
+The data reveal a striking divergence between raw percentages and adjusted realities. In simple comparisons, White non-Hispanic households appear most burdened, with 11.6 percent exceeding the 40 percent PIR threshold, compared to 5.3 to 9.6 percent for minority groups. Homeowners also appear more burdened (8.5 percent) than renters (2.8 percent). However, these raw patterns mask underlying structural risks because White households are overrepresented in high-wealth groups, and homeownership mechanically increases debt payments via mortgages.
 
-**Raw Patterns Mask Structural Risk.** In bivariate analysis, White non-Hispanic households show the highest raw rate of high debt burden (11.6%), while minority groups range from 5.3% to 9.6%. Homeowners also appear more burdened (8.5%) than renters (2.8%).
+When comparing households with similar wealth, education, and family structures, the narrative flips. Asian households face the highest adjusted odds of high debt burden, at nearly three times the rate of White households. Hispanic and Black households face approximately 90 percent and 74 percent higher odds, respectively. To anchor this scale, a household in the bottom wealth quartile is more than three times as likely to experience high debt burden as a household in the top decile.
 
-**Racial Disparities Emerge After Controls.** When comparing households with similar wealth, education, and family structures, the narrative flips. Asian, Hispanic, and Black households face significantly higher adjusted odds of high debt burden than White households. Compositional differences—such as White households being overrepresented in high-wealth groups—mask underlying racialized risks.
+Wealth provides a strong, monotonic protective effect. Households in the top 10 percent of the wealth distribution have 75 percent lower odds of high debt burden compared to those in the bottom 25 percent. Notably, factors often assumed to drive financial stability, such as higher education or middle age, do not independently reduce debt burden once race and wealth are accounted for. A college degree does not shield minority households from racialized credit markets.
 
-**Wealth Protects, but Homeownership is a Metric Artifact.** Wealth shows a strong, monotonic protective gradient; the top 10% have 75% lower odds of high debt burden than the bottom quartile. The apparent risk associated with homeownership reflects the inclusion of mortgage payments in the debt burden metric rather than a causal effect of housing tenure.
+Ultimately, debt circulates along pathways shaped by pre-existing vulnerabilities. Households without assets lack buffers against income shocks, forcing them to rely on credit to maintain basic consumption. The persistence of these disparities suggests that historical exclusion from wealth-building programs and ongoing discrimination continue to shape financial vulnerability independent of measured socioeconomic status.
 
 # Implication
 
-High debt burden is systematically concentrated among racial minorities and asset-poor households, independent of individual socioeconomic status. These findings challenge narratives that attribute financial distress solely to human capital deficits. Instead, debt burden operates through structural barriers—such as discriminatory lending and intergenerational wealth gaps. Policies aimed at reducing financial fragility must shift focus from broad-based homeownership promotion toward targeted interventions that build liquid assets and address systemic inequities in credit markets.
+These findings suggest that interventions focused solely on financial literacy or broad-based homeownership promotion may be insufficient to reduce financial fragility. Because debt burden reflects structural barriers rather than individual deficits, policymakers may want to examine whether existing safety nets effectively reach lower-income and minority households.
+
+The persistent adjusted disparities suggest that racially targeted debt relief and credit market reforms addressing discriminatory lending could be more effective than universal financial education campaigns. Furthermore, because wealth protection is strongest at the top of the distribution, policies may warrant a focus on helping households escape the bottom wealth quartile through robust emergency savings infrastructure. Ultimately, reducing high debt burden requires acknowledging that financial fragility is shaped by structural forces as much as individual circumstances.
