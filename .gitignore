@@ -1,0 +1,14 @@
+# Ignore all data, results, drafts, and large outputs
+data/
+results/
+archive/
+visualizations/
+*.RData
+*.Rhistory
+*.Rproj.user/
+*.pdf
+*.rds
+*.csv
+*.xlsx
+*.png
+*.jpg

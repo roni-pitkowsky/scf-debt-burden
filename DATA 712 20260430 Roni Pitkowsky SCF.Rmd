@@ -1,0 +1,1074 @@
+---
+title: "DATA 712 Midterm"
+subtitle: "Spring 2026"
+author: "Roni Pitkowsky"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+
+surname: "Pitkowsky"
+runningtitle: "DATA 712 Midterm"
+
+author_dept:  "Department of Sociology"
+author_inst:  "Queens College, City University of New York"
+author_email: "roni.pitkowsky88@qmail.cuny.edu"
+
+bibliography: references.bib
+csl: apa-6th-edition.csl
+fontpath: fonts/
+
+anonymize: false
+doublespace: false
+linenumbers: false
+numbersections: false
+maincolumns: 1
+fontset: demography
+
+output:
+  pdf_document:
+    template: jnctemplate.tex
+    latex_engine: xelatex
+    keep_tex: true
+
+header-includes:
+   - \usepackage{booktabs}
+   - \usepackage{pdflscape}
+---
+
+```{r setup, warning = FALSE, include=FALSE}
+
+rm(list=ls())
+gc()
+
+knitr::opts_knit$set(root.dir ="C:/Users/ronip/Documents/Queens College/2026 Spring/DATA 712/scf-debt-burden")
+
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(scf)
+library(tidyverse)
+library(readxl)
+library(flextable)
+library(ggplot2)
+library(lmtest)
+library(car)
+library(survey)
+
+set.seed(613)
+
+```
+
+```{r build and load data, include=FALSE}
+
+# ============================================================
+# BUILD AND LOAD DATA
+# ============================================================
+
+# Check if cached file exists
+if(file.exists("data/scf_filtered.rds")) {
+  scf_filtered <- readRDS("data/scf_filtered.rds")
+  # message("Loaded cached SCF data.")
+  } else {
+    # STEP 1: LOAD DATA (Creates correct survey design objects)
+    year = 2022
+    scf_raw <- scf_load(year, data_directory = "data/")
+  
+    # STEP 2: UPDATE VARIABLES (Adds derived vars safely)
+    scf_filtered <- scf_update(scf_raw,
+  
+  # --- Outcome Variable ---
+  # Ensure binary 0/1 (adjust logic if your pir40 is coded differently)
+  pir40 = as.numeric(pir40 == 1), 
+  pir40_label = factor(ifelse(pir40 == 1, "High Debt Burden",
+                              "No High Debt Burden"),
+                           levels = c("No High Debt Burden",
+                                      "High Debt Burden")),
+  
+  # --- Demographics ---
+  sex = factor(case_when(
+    hhsex == 1 ~ "Male",
+    hhsex == 2 ~ "Female",
+    TRUE ~ NA_character_
+  ), levels = c("Male", "Female"), ordered = FALSE),
+  
+  age_group = factor(case_when(
+    age >= 18 & age <= 29 ~ "18-29",
+    age >= 30 & age <= 39 ~ "30-39",
+    age >= 40 & age <= 49 ~ "40-49",
+    age >= 50 & age <= 59 ~ "50-59",
+    age >= 60 & age <= 69 ~ "60-69",
+    age >= 70 ~ "70+",
+    TRUE ~ NA_character_
+  ), levels = c("18-29", "30-39", "40-49", "50-59", "60-69", "70+"), 
+     ordered = FALSE),
+  
+  race_label = factor(case_when(
+    race == 1 ~ "White non-Hispanic",
+    race == 2 ~ "Black/African American",
+    race == 3 ~ "Hispanic",
+    race == 4 ~ "Asian/Pacific Islander",
+    race == 5 ~ "Other",
+    TRUE ~ NA_character_
+  ), levels = c("White non-Hispanic", "Black/African American", 
+                "Hispanic", "Asian/Pacific Islander", "Other"), 
+     ordered = FALSE),
+  
+  # --- Family Structure ---
+  married_factor = factor(married,
+                          levels = c(1, 2),
+                          labels = c("Married", "Not Married"),
+                          ordered = FALSE),
+  
+  married_detailed = case_when(
+        x8023 == 1 ~ "Married",
+        x8023 == 2 ~ "Cohabitating",
+        x8023 == 3 ~ "Separated",
+        x8023 == 4 ~ "Divorced",
+        x8023 == 5 ~ "Widowed",
+        x8023 == 6 ~ "Never Married",
+        TRUE ~ NA_character_
+        ) %>% 
+        factor(
+          levels = c("Married", "Cohabitating", 
+                     "Separated", "Divorced", 
+                     "Widowed", "Never Married"),
+          ordered = FALSE
+          ),
+  
+  has_children = factor(kids > 0,
+                        levels = c(FALSE, TRUE),
+                        labels = c("No Children", "Has Children"),
+                        ordered = FALSE),
+  
+  # --- Socioeconomic ---
+  educ_cat = factor(case_when(
+    educ %in% -1:7 ~ "Less than High School",
+    educ == 8 ~ "High School Graduate",
+    educ == 9 ~ "Some College",
+    educ %in% 10:11 ~ "Associate's Degree",
+    educ %in% 12:14 ~ "Bachelor's Degree or Higher",
+    TRUE ~ NA_character_
+  ), levels = c("Less than High School", "High School Graduate", 
+                "Some College", "Associate's Degree", "Bachelor's Degree or Higher"), 
+     ordered = FALSE),
+  
+  wealth_group = factor(case_when(
+    nwcat == 1 ~ "Bottom 25%",
+    nwcat == 2 ~ "25–50%", 
+    nwcat == 3 ~ "50–75%",
+    nwcat == 4 ~ "75–90%",
+    nwcat == 5 ~ "Top 10%"
+  ), levels = c("Bottom 25%", "25–50%", "50–75%", "75–90%", "Top 10%"), 
+     ordered = FALSE),
+  
+  homeownership = factor(housecl,
+                         levels = c(1, 2),
+                         labels = c("Homeowner", "Renter"),
+                         ordered = FALSE)
+  )
+    saveRDS(scf_filtered, "data/scf_filtered_updated.rds")
+    # message("Created and saved cached SCF data.")
+  }
+
+# Verify variables were created
+
+c("pir40", "age", "sex", "married_factor", "married", "married_detailed", "wealth_group", "has_children", "housecl", "homeownership", "race_label", "pir40_label") %in% names(scf_filtered$mi_design[[1]]$variables)
+
+```
+
+
+
+Household debt in the United States has reached unprecedented levels, posing a significant threat to financial stability and economic mobility for millions of families. While aggregate debt figures often dominate headlines, the distribution of debt burden across the population remains uneven and poorly understood. High debt service payments constrain households' ability to save, invest, and weather economic shocks, potentially exacerbating existing inequalities. Understanding precisely which households bear this burden—and whether these patterns reflect individual choices or systemic barriers—is critical for designing effective financial safety nets.
+
+This analysis examines the prevalence and predictors of high debt burden among U.S. households using data from the 2022 Survey of Consumer Finances (SCF). Specifically, it tests whether racial and wealth disparities in debt burden persist after controlling for socioeconomic characteristics such as education and family structure. **Guided by emerging scholarship on structural financial vulnerability, the analysis asks whether debt burden circulates through racialized pathways independent of measured economic resources.** The findings reveal that high debt burden is not randomly distributed but is systematically concentrated among racial minorities and asset-poor households. Crucially, multivariate regression results indicate that racial disparities remain significant even after extensive controls, suggesting that factors beyond individual socioeconomic status drive financial fragility. Furthermore, wealth shows a strong protective gradient, while homeownership is associated with higher debt burden—likely reflecting the inclusion of mortgage payments in debt burden metrics rather than a causal effect of tenure. Notably, education and age do not independently predict burden after accounting for race and wealth.
+
+These results challenge narratives that attribute financial distress solely to individual financial management or human capital deficits. Instead, they point to the enduring influence of structural inequities in credit access and wealth accumulation. Consequently, policies aimed at reducing debt burden may need to shift focus from broad-based homeownership promotion or financial literacy campaigns toward targeted interventions that address systemic barriers and build liquid assets for vulnerable populations. The following sections provide background on debt burden metrics and theoretical debates, detail the methodological approach using complex survey data, present empirical results, and discuss implications for policy and future research.
+
+# Background
+
+*Payment-to-Income Ratio (PIR)* measures monthly debt payments as a percentage of monthly income. The Federal Reserve uses a household PIR > 40% as a standard measure of financial distress and is considered a high debt burdened household. This matters because households with high debt burden are vulnerable to income shocks and have a limited ability to save or build wealth.
+
+However, why certain households face high debt burden is debated. Some emphasize individual factors—education, employment stability, financial literacy—while others point to structural barriers like credit market discrimination or unequal wealth accumulation. This analysis tests whether racial and wealth disparities in high debt burden persist after controlling for individual socioeconomic characteristics, using multivariate regression with Survey of Consumer Finances data. If disparities remain after extensive controls, it would suggest that factors beyond individual characteristics contribute to financial fragility.
+
+The policy relevance is clear: identifying whether at-risk populations face debt burden due to compositional disadvantages or independent structural barriers informs whether interventions should target individual financial capability or systemic reform.
+
+# Methods
+## Data and Analytic Approach
+
+Data for this analysis comes from the U.S. Federal Reserve's (2022) *Survey of Consumer Finances* (SCF) [@FederalReserve2022]. The SCF is a triennial survey of U.S. households, which collects data on household assets, debts, incomes and expenditures, as well as other information. The survey utilizes a complex sampling mechanism with 999 replicate weights and a multiple imputation scheme (five implicates) to handle missing data and estimate variance. To facilitate the handling of this data, I utilized the `scf` R package [@Cohen2025].
+
+The unit of analysis is the household. This report examines **high debt burden**, defined as a Payment-to-Income Ratio (PIR) exceeding 40%. Categorical predictors (wealth, education, age, sex) were recoded to facilitate interpretation. Key predictors include age group, sex, marital status, wealth group, education, presence of children, homeownership, and race/ethnicity.
+
+## Theoretical Framework: Testing a Structural Hypothesis
+
+This analysis is guided by emerging scholarship on the structural production of financial vulnerability, particularly Frederick Wherry's concept of "viral debt" [@Wherry2026]. Wherry argues that indebtedness circulates through communities along pathways shaped by historical exclusion and policy design, rather than spreading randomly or reflecting individual choices alone. From this perspective, racial disparities in debt burden should persist even after accounting for measurable socioeconomic differences—because financial strain is produced by structural barriers, not just compositional factors.
+
+To test this hypothesis, I estimated multivariate regression models that isolate the independent association of race with high debt burden after controlling for wealth, education, family structure, and homeownership. The key question is: Do racial disparities persist when comparing households with similar economic profiles? If yes, this would suggest that debt burden operates through racialized structures rather than individual characteristics.
+
+## Analytic Strategy
+
+Analyses were conducted in three stages: (1) univariate statistics to establish prevalence, (2) bivariate cross-tabulations by demographic characteristics, and (3) multivariate logistic regression to predict high debt burden. Regression models were estimated using survey-weighted logistic regression. All estimates account for the complex survey design using replicate weights. Categorical predictors were coded as unordered factors with treatment contrasts, using the following reference groups: White non-Hispanic (race), Bottom 25% (wealth), Less than High School (education), 18-29 (age), Married (marital status), No Children, and Homeowner. Regression results are reported as Odds Ratios (OR), where values greater than 1 indicate increased odds of high debt burden relative to the reference group.
+
+```{r Univariate Analysis, echo=FALSE}
+
+# ============================================================
+# EMPIRICS: WHO IS IN THE HIGH-DEBT-BURDEN GROUP?
+# ============================================================
+# Outcome: High debt burden (PIR > 40%)
+# PIR = Payment-to-Income Ratio - the percentage of monthly income 
+# going to debt payments. PIR > 40% indicates financial distress.
+
+# -------------------------
+# Univariate Analysis
+# -------------------------
+
+# Check how common high debt burden is
+hdb_freq <- scf_freq(scf_filtered, ~pir40_label)
+
+hdb <- round(hdb_freq[["results"]][["proportion"]][[2]], 2)
+
+# Values: 6.55% of U.S. households have high debt burden (PIR > 40%)
+#         93.45% do not
+
+# Create univariate table
+hdb_table <- hdb_freq$results %>%
+  mutate(
+    display = paste0(round(proportion, 1), "%")
+  ) %>%
+  select(category, display) %>%
+  flextable() %>%
+  theme_booktabs() %>%
+  set_header_labels(
+    category = "Debt Burden Status",
+    display = "Percent of Households"
+  ) %>%
+  align(align = "left", part = "header") %>%
+  align(align = "center", part = "body") %>%
+  fontsize(size = 11, part = "all") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  bold(part = "header") %>%
+  autofit() %>%
+  add_header_lines("Table 1: Prevalence of High Debt Burden") %>%
+  set_caption("Share of households with PIR > 40%, 2022 SCF") %>%
+  add_footer_lines(as_paragraph(
+    "Note: High debt burden defined as payment-to-income ratio (PIR) > 40%. ",
+    "Values are survey-weighted percentages."
+  ))
+
+# print(hdb_table)
+
+```
+
+# Empirics
+## Univariate Statistics
+
+The data shows that `r hdb`% of U.S. households have high debt burden (PIR > 40%). Financial fragility affects a meaningful minority of households—approximately 1 in 15.
+
+```{r Bivariate Analysis, echo=FALSE}
+
+# ============================================================
+# INDIVIDUAL BIVARIATE TABLES & AUTOMATICALLY EXTRACT BIVARIATE VALUES
+# ============================================================
+
+# Check if bivariate analysis has already been run and cached
+if(file.exists("results/bivariate_analysis.rds")) {
+  # Load all cached bivariate objects
+  biv_cache <- readRDS("results/bivariate_analysis.rds")
+  invisible(list2env(biv_cache, .GlobalEnv))
+  # message("Loaded cached bivariate analysis.")
+} else {
+  
+  # 1. Wealth Group
+  
+  # Define the correct order for wealth groups
+  wealth_order <- c("Bottom 25%", "25–50%", "50–75%", "75–90%", "Top 10%")
+  
+  wealth_cross <- scf_xtab(scf_filtered, ~wealth_group, ~as.factor(pir40), scale = "row")
+  wealth_df <- wealth_cross$results
+  wealth_values <- wealth_df %>%
+    filter(col == 1) %>%
+    select(row, row_share) %>%
+    mutate(row = factor(row, levels = wealth_order)) %>%
+    arrange(row)
+  wealth_pct <- wealth_values$row_share * 100
+  
+  wealth_data <- data.frame(
+    Wealth_Group = c("Bottom 25%", "25-50%", "50-75%", "75-90%", "Top 10%"),
+    Percent_High_Burden = round(wealth_pct, 2)
+  )
+  
+  # Values:
+  # Bottom 25%: 10.07% have high debt burden ← highest!
+  # 25-50%:    7.61% have high debt burden
+  # 50-75%:    4.83% have high debt burden
+  # 75-90%:    4.36% have high debt burden
+  # Top 10%:   3.11% have high debt burden
+  # Key insight: Inverted-U pattern - middle class has highest debt burden
+  
+  
+  # 2. Age Group
+  age_cross <- scf_xtab(scf_filtered, ~age_group, ~as.factor(pir40), scale = "row")
+  age_df <- age_cross$results
+  age_values <- age_df %>%
+    filter(col == 1) %>%
+    select(row, row_share) %>%
+    arrange(row)
+  age_pct <- age_values$row_share * 100
+  
+  age_data <- data.frame(
+    Age_Group = c("18-29", "30-39", "40-49", "50-59", "60-69", "70+"),
+    Percent_High_Burden = round(age_pct, 2)
+  )
+  
+  # Values:
+  # 18-29:  5.28%
+  # 30-39:  8.63%
+  # 40-49:  6.44%
+  # 50-59:  5.63%
+  # 60-69:  8.18%
+  # 70+:    4.73%
+  
+  
+  # 3. Sex
+  sex_cross <- scf_xtab(scf_filtered, ~sex, ~as.factor(pir40), scale = "row")
+  sex_df <- sex_cross$results
+  sex_values <- sex_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  sex_pct <- sex_values$row_share * 100
+  
+  sex_data <- data.frame(
+    Sex = c("Male", "Female"),
+    Percent_High_Burden = round(sex_pct, 2)
+  )
+  
+  # Values:
+  # Male:   7.94% have high debt burden (overall average)
+  # Female: 6.01% have high debt burden
+  
+  
+  # 4a. Marital Status
+  marital_cross <- scf_xtab(scf_filtered, ~married, ~as.factor(pir40), scale = "row")
+  marital_df <- marital_cross$results
+  marital_values <- marital_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  marital_pct <- marital_values$row_share * 100
+  
+  # Values:
+  # Married:   5.95%
+  # Unmarried: 7.35%
+  
+  # 4b. Marital Status (Detailed)
+  marital_cross <- scf_xtab(scf_filtered, ~married_detailed, ~as.factor(pir40), scale = "row")
+  marital_df <- marital_cross$results
+  marital_values <- marital_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  marital_pct <- marital_values$row_share * 100
+  
+  marital_data <- data.frame(
+    marital_Status = c("Married", "Cohabitating", "Separated", "Divorced",
+      "Widowed", "Never Married"),
+    Percent_High_Burden = round(marital_pct, 2)
+  )
+  
+  # Values
+  # Married:        7.13%
+  # Cohabitating:   9.18%
+  # Separated:      5.69%
+  # Divorced:       5.41%
+  # Widowed:        11.40%
+  # Never Married:  7.65%
+  
+  
+  # 5. Education
+  educ_cross <- scf_xtab(scf_filtered, ~educ_cat, ~as.factor(pir40), scale = "row")
+  educ_df <- educ_cross$results
+  educ_values <- educ_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  educ_pct <- educ_values$row_share * 100
+  
+  educ_data <- data.frame(
+    Education = c("Less than High School", "High School Graduate", "Some College", "Associate's Degree", "Bachelor's Degree or Higher"),
+    Percent_High_Burden = round(educ_pct, 2)
+  )
+  
+  # Values:
+  # Less than High School:          6.54%
+  # High School Graduate:           5.59%
+  # Some College:                   7.61%
+  # Associate's Degree:             8.40%
+  # Bachelor's Degree or Higher:    6.31%
+  
+  
+  # 6. Children
+  children_cross <- scf_xtab(scf_filtered, ~has_children, ~as.factor(pir40), scale = "row")
+  children_df <- children_cross$results
+  children_values <- children_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  children_pct <- children_values$row_share * 100
+  
+  children_data <- data.frame(
+    Children = children_values$row,
+    Percent_High_Burden = round(children_values$row_share * 100, 2)
+  )
+  
+  # Values:
+  # Has children: 5.73%
+  # No children: 7.82%
+  
+  
+  # 7. Homeownership
+  homeowner_cross <- scf_xtab(scf_filtered, ~homeownership, ~as.factor(pir40), scale = "row")
+  homeowner_df <- homeowner_cross$results
+  homeowner_values <- homeowner_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  homeowner_pct <- homeowner_values$row_share * 100
+  
+  homeowner_data <- data.frame(
+    Homeownership = c("Homeowner", "Renter"),
+    Percent_High_Burden = round(homeowner_pct, 2)
+  )
+  
+  # Values:
+  # Homeowner:  8.48%
+  # Renter:     2.78%
+  
+  
+  # 8. Race/Ethnicity
+  race_cross <- scf_xtab(scf_filtered, ~race_label, ~as.factor(pir40), scale = "row")
+  race_df <- race_cross$results
+  race_values <- race_df %>%
+    filter(col == 1) %>%
+    select(row, row_share)
+  race_pct <- race_values$row_share * 100
+  
+  race_data <- data.frame(
+    Race_Ethnicity = race_values$row,
+    Percent_High_Burden = round(race_pct, 2)
+  )
+  
+  # Create minorities HDB crosstab table
+  race_data_minorities <- race_data %>% 
+    filter(Race_Ethnicity != "White non-Hispanic")
+  
+  # Values:
+  # White non-Hispanic:        11.61%
+  # Black/African American:    8.83%
+  # Hispanic:                  9.62%
+  # Asian/Pacific Islander:    7.47%
+  # Other                      5.30%
+  
+  
+  # ============================================================
+  # COMBINE ALL BIVARIATE RESULTS INTO ONE TABLE
+  # ============================================================
+  
+  # 1. Wealth Group
+  wealth_rows <- wealth_values %>% 
+    mutate(
+      variable = "Wealth Group", 
+      category = factor(row, levels = c("Bottom 25%", "25–50%", "50–75%", "75–90%", "Top 10%")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 2. Age Group
+  age_rows <- age_values %>% 
+    mutate(
+      variable = "Age Group", 
+      category = factor(row, levels = c("18-29", "30-39", "40-49", "50-59", "60-69", "70+")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 3. Sex (ordered: Male first, then Female)
+  sex_rows <- sex_values %>% 
+    mutate(
+      variable = "Sex", 
+      category = factor(row, levels = c("Male", "Female")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 4. Marital Status
+  marital_rows <- marital_values %>% 
+    mutate(
+      variable = "Marital Status", 
+      category = factor(row, levels = c("Married", "Cohabitating", "Separated", "Divorced", "Widowed", "Never Married")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 5. Education (ordered by level)
+  educ_rows <- educ_values %>% 
+    mutate(
+      variable = "Education", 
+      category = factor(row, levels = c("Less than High School", "High School Graduate", "Some College", "Associate's Degree", "Bachelor's Degree or Higher")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 6. Children (ordered: No Children first, then Has Children)
+  children_rows <- children_values %>% 
+    mutate(
+      variable = "Children", 
+      category = factor(row, levels = c("No Children", "Has Children")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 7. Homeownership
+  homeowner_rows <- homeowner_values %>% 
+    mutate(
+      variable = "Homeownership", 
+      category = factor(row, levels = c("Homeowner", "Renter")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # 8. Race/Ethnicity
+  race_rows <- race_values %>% 
+    mutate(
+      variable = "Race/Ethnicity", 
+      category = factor(row, levels = c("White non-Hispanic", "Black/African American", "Hispanic", "Asian/Pacific Islander", "Other")),
+      pct_high_burden = round(row_share * 100, 1)
+    ) %>% 
+    arrange(category) %>%
+    select(variable, category, pct_high_burden)
+  
+  # NOW bind all rows together
+  bivariate_summary <- bind_rows(
+    wealth_rows,
+    age_rows,
+    race_rows,
+    homeowner_rows,
+    marital_rows,
+    educ_rows,
+    children_rows,
+    sex_rows
+  ) %>%
+    # Order variables logically
+    mutate(
+      variable = factor(variable, levels = c(
+        "Wealth Group", "Age Group", "Sex",
+        "Marital Status", "Education", "Children", "Homeownership", "Race/Ethnicity"
+      ))
+    ) %>%
+    arrange(variable)
+  
+  
+  # Create flextable
+  bivariate_table <- bivariate_summary %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    set_header_labels(
+      variable = "Predictor",
+      category = "Category",
+      pct_high_burden = "% with High\nDebt Burden"
+    ) %>%
+    bold(part = "header") %>%
+    align(align = "left", j = 1:2) %>%
+    align(align = "right", j = 3) %>%
+    fontsize(size = 11, part = "all") %>%
+    font(fontname = "Times New Roman", part = "all") %>%
+    add_header_lines("Table 2: Bivariate Associations with High Debt Burden (PIR > 40%)") %>%
+    add_footer_lines("Note: Percentages are survey-weighted. Data from 2022 Survey of Consumer Finances.") %>%
+    autofit()
+  
+  # Save ALL bivariate objects to a single cache file
+  biv_cache <- list(
+    # Individual data frames
+    wealth_data = wealth_data,
+    age_data = age_data,
+    sex_data = sex_data,
+    marital_data = marital_data,
+    educ_data = educ_data,
+    children_data = children_data,
+    homeowner_data = homeowner_data,
+    race_data = race_data,
+    race_data_minorities = race_data_minorities,
+    
+    # Raw values for custom tables
+    wealth_values = wealth_values,
+    age_values = age_values,
+    sex_values = sex_values,
+    marital_values = marital_values,
+    educ_values = educ_values,
+    children_values = children_values,
+    homeowner_values = homeowner_values,
+    race_values = race_values,
+    
+    # Combined summary and table
+    bivariate_summary = bivariate_summary,
+    bivariate_table = bivariate_table,
+    
+    # Inline reporting variables
+    renter_hdb = round(homeowner_pct[homeowner_values$row == "Renter"], 1),
+    homeowner_hdb = round(homeowner_pct[homeowner_values$row == "Homeowner"], 1),
+    lowest_wealth_q_hdb = round(wealth_pct[1], 1),
+    highest_wealth_q_hdb = round(wealth_pct[5], 1),
+    white_hdb = round(race_pct[race_values$row == "White non-Hispanic"], 1),
+    black_hdb = round(race_pct[race_values$row == "Black/African American"], 1),
+    hispanic_hdb = round(race_pct[race_values$row == "Hispanic"], 1),
+    minority_min_hdb = round(min(race_pct[race_values$row != "White non-Hispanic"]), 1),
+    minority_max_hdb = round(max(race_pct[race_values$row != "White non-Hispanic"]), 1),
+    male_hdb = round(sex_pct[sex_values$row == "Male"], 1),
+    female_hdb = round(sex_pct[sex_values$row == "Female"], 1),
+    no_children_hdb = round(children_pct[children_values$row == "No Children"], 1),
+    children_hdb = round(children_pct[children_values$row == "Has Children"], 1)
+  )
+  
+  saveRDS(biv_cache, "results/bivariate_analysis.rds")
+  list2env(biv_cache, .GlobalEnv)
+  # message("Created and saved bivariate analysis.")
+}
+
+# Display the combined bivariate table
+# bivariate_table
+
+```
+
+## Bivariate statistics
+
+Table 2 (below) depicts the distribution of high debt burden across key predictors including age group, sex, marital status, wealth group, education, presence of children, homeownership, and race/ethnicity.
+
+`r bivariate_table`
+
+At first glance, simple cross-tabulations suggest that high debt burden is concentrated among renters (`r renter_hdb`%) compared to homeowners (`r homeowner_hdb`%), and households in the bottom wealth quartile (`r lowest_wealth_q_hdb`%) compared to the top decile (`r highest_wealth_q_hdb`%). Counterintuitively, White non-Hispanic households show the highest raw rate (`r white_hdb`%) compared to racial minorities (`r minority_min_hdb`–`r minority_max_hdb`%). However, as multivariate analysis will show, these bivariate patterns shift dramatically after controlling for wealth and family structure.
+
+These patterns align with intuitive narratives that debt burden appears linked to housing tenure, asset poverty, and—surprisingly—White racial identity. However, bivariate patterns can be misleading when groups differ systematically on other factors. Renters, for instance, tend to have lower wealth; White households are overrepresented among high-wealth groups. These compositional differences can obscure the true drivers of financial strain.
+
+The following section tests whether these patterns persist after accounting for wealth, education, and family structure. If racial disparities emerge after controls, this would suggest that debt burden circulates through structural pathways rather than reflecting compositional differences alone.
+
+```{r Regression Analysis, echo=FALSE}
+
+# ============================================================
+# REGRESSION ANALYSIS - SINGLE CACHE FILE
+# ============================================================
+
+if(file.exists("results/regression_analysis.rds")) {
+  # Load all cached regression objects
+  reg_cache <- readRDS("results/regression_analysis.rds")
+  invisible(list2env(reg_cache, .GlobalEnv))
+  # message("Loaded cached regression analysis.")
+} else {
+  start.time <- Sys.time()
+  
+  # Run logistic regression using package function
+  model <- scf_logit(
+    scf_filtered, 
+    pir40 ~ age_group + sex + married_factor + wealth_group + educ_cat + 
+      has_children + homeownership + race_label,
+    odds = TRUE  
+  )
+  
+  # Prepare data for flextable
+  results_display <- model$results %>%
+    mutate(
+      display_odds = paste0(round(estimate, 3), stars, " (", round(std.error, 3), ")")
+    ) %>%
+    select(term, display_odds)
+  
+  # Create flextable for the regression results
+  regression_table <- results_display %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    set_header_labels(
+      term = "Predictor",
+      display_odds = "Odds Ratio (Std. Error)"
+    ) %>%
+    bold(part = "header") %>%
+    align(align = "left", j = 1) %>%
+    align(align = "center", j = 2) %>%
+    fontsize(size = 11, part = "all") %>%
+    font(fontname = "Times New Roman", part = "all") %>%
+    autofit() %>%
+    add_header_lines("Table 3: Logistic Regression Predicting High Debt Burden") %>%
+    add_footer_lines("Note: *** p < 0.001, ** p < 0.01, * p < 0.05. High debt burden = PIR > 40%. Data from 2022 Survey of Consumer Finances.")
+  
+  # ============================================================
+  # EXTRACT VALUES FROM REGRESSION FOR INLINE REPORTING
+  # ============================================================
+  
+  # Wealth
+  wealth_50_75_or <- round(model$results[["estimate"]][[10]], 2)
+  wealth_50_75_p <- round(model$results[["p.value"]][[10]], 3)
+  wealth_50_75_odds <- (1 - wealth_50_75_or) * 100
+  wealth_top_or <- round(model$results[["estimate"]][[12]], 2)
+  wealth_top_odds <- (1 - wealth_top_or) * 100
+  
+  # Marital status
+  married_OR <- round(model$results[["estimate"]][[8]], 2)
+  married_p <- round(model$results[["p.value"]][[8]], 3)
+  married_odds <- (married_OR - 1) * 100
+  
+  # Race
+  black_or <- round(model$results[["estimate"]][[19]], 2)
+  black_p <- round(model$results[["p.value"]][[19]], 3)
+  hispanic_or <- round(model$results[["estimate"]][[20]], 2)
+  hispanic_p <- round(model$results[["p.value"]][[20]], 3)
+  asian_or <- round(model$results[["estimate"]][[21]], 2)
+  asian_p <- round(model$results[["p.value"]][[21]], 3)
+  
+  # Presence of children
+  children_OR <- round(model$results[["estimate"]][[17]], 2)
+  children_p <- round(model$results[["p.value"]][[17]], 3)
+  children_odds <- (children_OR - 1) * 100
+  
+  # Homeownership
+  homeownership_or <- round(model$results[["estimate"]][[18]], 2)
+  renter_odds <- (1 - homeownership_or) * 100
+  
+  end.time <- Sys.time()
+  time.taken <- end.time - start.time
+  # print(time.taken)
+  
+  # Save ALL regression objects to a single cache file
+  reg_cache <- list(
+    # Model results data frame
+    results_df = model$results,
+    results_display = results_display,
+    
+    # Flextable object
+    regression_table = regression_table,
+    
+    # Inline reporting variables
+    wealth_50_75_or = wealth_50_75_or,
+    wealth_50_75_p = wealth_50_75_p,
+    wealth_50_75_odds = wealth_50_75_odds,
+    wealth_top_or = wealth_top_or,
+    wealth_top_odds = wealth_top_odds,
+    married_OR = married_OR,
+    married_p = married_p,
+    married_odds = married_odds,
+    black_or = black_or,
+    black_p = black_p,
+    hispanic_or = hispanic_or,
+    hispanic_p = hispanic_p,
+    asian_or = asian_or,
+    asian_p = asian_p,
+    children_OR = children_OR,
+    children_p = children_p,
+    children_odds = children_odds,
+    homeownership_or = homeownership_or,
+    renter_odds = renter_odds
+  )
+  
+  saveRDS(reg_cache, "results/regression_analysis.rds")
+  list2env(reg_cache, .GlobalEnv)
+  # message("Created and saved regression analysis.")
+}
+
+# Display the regression table
+# regression_table
+
+```
+
+
+```{r visualizations, echo=FALSE}
+
+# ============================================================
+# CREATE COMPARISON CHARTS
+# ============================================================# 
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Set race order explicitly
+race_comparison <- data.frame(
+  Race = c(race_data[[1]]),
+  Bivariate_Rate = c(race_data[[2]]),
+  Adjusted_OR = c(1.00, round(results_df[[2]][19:22], 2))
+) %>%
+  mutate(
+    Race = factor(Race, 
+                  levels = c("White non-Hispanic", "Black/African American", 
+                             "Hispanic", "Asian/Pacific Islander", "Other"))
+  )
+
+# Reshape for plotting
+race_plot_data <- race_comparison %>%
+  select(Race, Bivariate_Rate, Adjusted_OR) %>%
+  pivot_longer(cols = c(Bivariate_Rate, Adjusted_OR), 
+               names_to = "Measure", 
+               values_to = "Value") %>%
+  mutate(
+    Measure = case_when(
+      Measure == "Bivariate_Rate" ~ "% with High Debt Burden\n(Bivariate)",
+      Measure == "Adjusted_OR" ~ "Odds Ratio\n(Adjusted)"
+    ),
+    Race = factor(Race, 
+                  levels = c("White non-Hispanic", "Black/African American", 
+                             "Hispanic", "Asian/Pacific Islander", "Other"))
+  )
+
+# Create separate data for reference line (ONLY for Adjusted panel)
+reference_line_data <- data.frame(
+  Measure = "Odds Ratio\n(Adjusted)",
+  yintercept = 1,
+  legend_label = "Reference (OR = 1)"  # Label for legend
+)
+
+# Create the plot
+race_plot <- ggplot(race_plot_data, aes(x = Race, y = Value, fill = Measure)) +
+  # Bars
+  geom_bar(stat = "identity", alpha = 0.8) +
+  # Reference line ONLY in Adjusted panel
+  geom_hline(data = reference_line_data, 
+             aes(yintercept = yintercept, linetype = legend_label),  
+             color = "red", linewidth = 1) +
+  # Colors for bars
+  scale_fill_manual(name = "", 
+                    values = c("% with High Debt Burden\n(Bivariate)" = "steelblue",
+                               "Odds Ratio\n(Adjusted)" = "coral")) +
+  # Linetype for reference line + legend
+  scale_linetype_manual(name = "", 
+                        values = c("Reference (OR = 1)" = "dashed"),
+                        guide = guide_legend(
+                          override.aes = list(
+                            color = "red", 
+                            fill = NA,      # No fill for line legend
+                            size = 1        # Line thickness in legend
+                          )
+                        )) +
+  # Labels
+  labs(title = "Racial Disparities: Raw Rates vs. Adjusted Odds",
+       subtitle = "Left: Bivariate percentages | Right: Regression odds ratios",
+       x = "", y = "") +
+  # Facet
+  facet_wrap(~Measure, scales = "free_y") +
+  # Theme with horizontal legend at bottom
+  theme_minimal(base_size = 14) +
+  theme(
+    # Legend positioning and layout
+    legend.position = "bottom",
+    legend.box = "horizontal",
+    legend.direction = "horizontal",
+    legend.spacing.x = unit(1, "cm"),
+    legend.margin = margin(t = 10),
+    # Legend key appearance
+    legend.key.width = unit(1.5, "cm"),
+    legend.key.height = unit(0.8, "cm"),
+    # Text styling
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12, color = "gray30"),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10, vjust = 1),
+    # Remove legend title spacing
+    legend.title = element_blank()
+  )
+
+# Save as PNG for PowerPoint
+ggsave("visualizations/presentation_race_plot.png", 
+       width = 12, height = 7, dpi = 300, bg = "white")
+
+# ============================================================
+# CREATE WEALTH GRADIENT CHART
+# ============================================================# 
+
+# Create wealth comparison data
+wealth_comparison <- data.frame(
+  Wealth_Group = factor(
+    c("Bottom 25%", "25-50%", "50-75%", "75-90%", "Top 10%"),
+    levels = c("Bottom 25%", "25-50%", "50-75%", "75-90%", "Top 10%")
+  ),
+  Bivariate_Rate = c(wealth_data[[2]]),  # From your bivariate analysis
+  Adjusted_OR = c(1.00, round(results_df[[2]][9:12], 2))        # From your regression (model$results)
+)
+
+# Reshape for plotting
+wealth_plot_data <- wealth_comparison %>%
+  select(Wealth_Group, Bivariate_Rate, Adjusted_OR) %>%
+  pivot_longer(cols = c(Bivariate_Rate, Adjusted_OR), 
+               names_to = "Measure", 
+               values_to = "Value") %>%
+  mutate(
+    Measure = case_when(
+      Measure == "Bivariate_Rate" ~ "% with High Debt Burden\n(Bivariate)",
+      Measure == "Adjusted_OR" ~ "Odds Ratio\n(Adjusted)"
+    ),
+    # Re-apply factor levels after pivot
+    Wealth_Group = factor(Wealth_Group, 
+                          levels = c("Bottom 25%", "25-50%", "50-75%", "75-90%", "Top 10%"))
+  )
+
+# Create separate data for reference line (ONLY for Adjusted panel)
+reference_line_data <- data.frame(
+  Measure = "Odds Ratio\n(Adjusted)",
+  yintercept = 1,
+  legend_label = "Reference (OR = 1)"
+)
+
+# Create the plot
+wealth_plot <- ggplot(wealth_plot_data, aes(x = Wealth_Group, y = Value, fill = Measure)) +
+  # Bars
+  geom_bar(stat = "identity", alpha = 0.8) +
+  # Reference line ONLY in Adjusted panel
+  geom_hline(data = reference_line_data, 
+             aes(yintercept = yintercept, linetype = legend_label),  
+             color = "red", linewidth = 1) +
+  # Colors for bars
+  scale_fill_manual(name = "", 
+                    values = c("% with High Debt Burden\n(Bivariate)" = "steelblue",
+                               "Odds Ratio\n(Adjusted)" = "coral")) +
+  # Linetype for reference line + legend
+  scale_linetype_manual(name = "", 
+                        values = c("Reference (OR = 1)" = "dashed"),
+                        guide = guide_legend(
+                          override.aes = list(
+                            color = "red", 
+                            fill = NA,
+                            size = 1
+                          )
+                        )) +
+  # Labels
+  labs(title = "Wealth Provides Strong, Monotonic Protection",
+     subtitle = "Left: Raw percentages | Right: Independent effect after controls",
+     x = "", y = "") +
+  facet_wrap(~Measure, scales = "free_y", 
+             labeller = labeller(Measure = c(
+               "% with High Debt Burden\n(Bivariate)" = "% with High Debt Burden\n(Raw Pattern)",
+               "Odds Ratio\n(Adjusted)" = "Odds Ratio\n(Independent Effect)"
+               ))) +
+  # Theme with horizontal legend at bottom
+  theme_minimal(base_size = 14) +
+  theme(
+    # Legend positioning and layout
+    legend.position = "bottom",
+    legend.box = "horizontal",
+    legend.direction = "horizontal",
+    legend.spacing.x = unit(1, "cm"),
+    legend.margin = margin(t = 10),
+    legend.key.width = unit(1.5, "cm"),
+    legend.key.height = unit(0.8, "cm"),
+    # Text styling
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12, color = "gray30"),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10, vjust = 1),
+    legend.title = element_blank()
+  )
+
+# Save as PNG for PowerPoint
+ggsave("visualizations/presentation_wealth_plot.png", 
+       width = 12, height = 7, dpi = 300, bg = "white")
+
+
+
+```
+
+## Regression Modeling
+
+Table 3 (below) shows the results from logistic regression analysis, predicting high debt burden based on age group, sex, marital status, wealth, education, children, homeownership, and race.
+
+`r regression_table`
+
+To isolate the independent effect of each factor, this analysis compares households *with the same wealth, education, and family structure*. This "apples-to-apples" comparison reveals a striking shift: after controls, racial disparities emerge as statistically significant predictors of high debt burden, while the apparent advantage of homeownership disappears. In other words, it is not housing tenure per se that predicts financial strain—it is race and wealth, even when comparing households with similar economic profiles.
+
+Asian households had the highest odds of high debt burden (OR = `r asian_or`, *p* < 0.001), followed by Hispanic (OR = `r hispanic_or`, *p* = `r hispanic_p`) and Black/African American households (OR = `r black_or`, *p* = `r black_p`). Wealth showed a clear protective gradient: households in the top 10% had `r wealth_top_odds`% lower odds compared to the bottom quartile (OR = `r wealth_top_or`, *p* < 0.001), with protection increasing monotonically across wealth levels.
+
+Education categories, age groups, sex, and presence of children were not statistically significant predictors after controls (all *p* > 0.10). This suggests that their bivariate associations operate through correlated factors like wealth and race rather than independently. Marital status showed a marginal association, with unmarried households facing elevated odds (OR = `r married_OR`, *p* = `r married_p`).
+
+# Discussion
+
+This analysis examined the prevalence and predictors of high debt burden among U.S. households using data from the 2022 Survey of Consumer Finances. Models accounted for the complex survey design, including replicate weights and multiple imputation. Results are reported as odds ratios to facilitate interpretation.
+
+## Wealth and the Protective Effect of Assets
+
+While bivariate analyses suggested homeownership and wealth were the strongest predictors of debt burden, multivariate modeling reveals a more nuanced picture. High debt burden steadily decreased with wealth in bivariate analysis, from `r lowest_wealth_q_hdb`% in the bottom quartile to `r highest_wealth_q_hdb`% in the top decile. The regression confirms this gradient: households in the top 10% have `r wealth_top_odds`% lower odds of high debt burden compared to the bottom quartile (OR = `r wealth_top_or`, *p* < 0.001). This indicates that wealth protects against debt burden, with the strongest effects concentrated among the wealthiest households.
+
+This pattern aligns with Wherry's observation that debt circulates along pathways shaped by pre-existing vulnerabilities. Households without assets lack buffers against income shocks, medical emergencies, or job loss—forcing them to rely on credit to maintain basic consumption. In this sense, debt "goes viral" not because of irresponsible behavior, but because asset poverty creates conditions in which financial strain becomes unavoidable.
+
+## Homeownership: Metric Artifact, Not Causal Protection
+
+Similarly, the bivariate pattern showed owners at higher risk (`r homeowner_hdb`% vs. `r renter_hdb`%), and the regression confirms renters have significantly lower odds (OR = `r homeownership_or`, *p* < 0.001). However, this likely reflects the construction of the PIR metric—which includes mortgage payments—rather than a causal protective effect of renting. Homeowners mechanically have higher debt service payments, making them more likely to exceed the 40% threshold. This suggests that asset levels, not tenure status per se, appear to be the salient factor for debt burden.
+
+This finding challenges policy narratives that promote homeownership as a universal solution to financial instability. If the apparent advantage of homeownership disappears after accounting for wealth, then policies focused solely on expanding tenure may miss the deeper driver: unequal access to asset accumulation itself.
+
+## Race and Structural Barriers
+
+The effects of race persisted after controlling for wealth, education, family structure, and homeownership, pointing to barriers beyond individual socioeconomic characteristics. Bivariate analysis showed White households with the highest raw rate (`r white_hdb`%), meanwhile the regression reveals minorities have higher adjusted odds, meaning compositional differences mask underlying risk. Disparities persist—and slightly widen—after controls, suggesting structural barriers beyond measurable socioeconomic factors.
+
+This is the central finding of this analysis, and it aligns closely with Wherry's framework. If debt burden were primarily driven by individual choices or human capital deficits, racial disparities should diminish after controlling for wealth and education. Instead, they persist. This suggests that racialized structures—discriminatory lending practices, unequal access to credit, intergenerational wealth gaps, labor market segregation—continue to shape financial vulnerability independent of measured socioeconomic status.
+
+In Wherry's terms, debt "goes viral" along racialized pathways. Historical exclusion from wealth-building programs (e.g., GI Bill, redlining), ongoing discrimination in mortgage and credit markets, and unequal inheritance patterns create conditions in which minority households face elevated financial strain even when they have similar education, wealth, and family structures as White households.
+
+## Education and Age: Compositional, Not Causal
+
+Education was not a significant predictor after controls, with no education category differing significantly from the reference group (less than high school). This contrasts with bivariate patterns and suggests that education's apparent protective effect operates through correlated factors like wealth and race rather than independently.
+
+Age group showed a non-linear pattern consistent with bivariate findings—households aged 30–39 and 60–69 show modestly elevated odds relative to the 18–29 reference group—but none of these differences reach conventional levels of significance. This suggests that life-cycle differences in debt burden are largely explained by wealth, race, and family structure.
+
+These null findings are themselves meaningful. They suggest that human capital and life-cycle stage do not independently protect against financial strain. A college degree does not shield Black households from racialized credit markets. Middle age does not protect against the cumulative effects of wealth inequality. This further supports a structural interpretation: financial fragility is produced by systems, not solved by individual advancement alone.
+
+## Family Structure: Marginal Effects
+
+After accounting for wealth and housing, marital status shows a marginal association: not being married is associated with `r married_odds`% higher odds of high debt burden (OR = `r married_OR`, *p* = `r married_p`), while having children shows a smaller, non-significant effect. Together, these results suggest that financial fragility is shaped less by any single demographic factor and more by the intersection of structural disadvantage (race) and asset position (wealth).
+
+## Implications for Policy and Theory
+
+These findings have important implications for how we understand and respond to household financial vulnerability. If debt burden reflects structural barriers rather than individual deficits, then interventions focused solely on financial literacy, credit counseling, or homeownership promotion may be insufficient. Instead, policies should target the pathways through which debt "goes viral":
+
+* Wealth-building interventions that help households escape the bottom quartile, where protection is strongest
+* Racially targeted debt relief that acknowledges persistent adjusted disparities among minority households
+* Credit market reforms that address discriminatory lending and unequal access to affordable credit
+* Emergency savings infrastructure that provides buffers against income shocks without relying on high-cost credit
+
+This analysis supports Wherry's call to view debt not as a moral failing but as a structural condition—one that circulates through communities along pathways shaped by policy, history, and inequality. Reducing financial fragility requires addressing these pathways, not just the symptoms they produce.
+
+# Conclusion
+
+This analysis reveals that high debt burden is not randomly distributed across the U.S. population but is systematically concentrated among racial minorities and households with fewer assets, even after accounting for socioeconomic differences. Using data from the 2022 Survey of Consumer Finances, this study examined the prevalence and predictors of high debt burden (PIR > 40%) among U.S. households. While high debt burden affects a minority of households (`r hdb`%), it is disproportionately concentrated among racial/ethnic minorities. Crucially, racial disparities persist even after controlling for wealth, education, family structure, and homeownership, suggesting factors beyond individual socioeconomic status are at play. Wealth provides strong, monotonic protection, while unmarried status shows a marginal independent association with higher burden.
+
+These findings align with emerging scholarship on structural financial vulnerability, which posits that debt circulates through communities along pathways shaped by historical exclusion rather than individual choices. Interventions should prioritize racial/ethnic minority households, not just low-income households, given the persistent adjusted disparities. Debt relief programs, financial counseling, or emergency savings initiatives might be more effective than broad-based homeownership promotion alone. Since wealth protection is strongest at the top of the distribution, policies should focus on helping households escape the bottom quartile rather than just accumulating assets. Support for single-parent households could mitigate the modestly elevated risk associated with unmarried status.
+
+There are limitations to this analysis. The model does not account for credit scores, regional cost of living, or debt composition (e.g., student loans vs. mortgages), which may explain some residual variation. Education and age group were not significant predictors after controls, suggesting their bivariate associations operate through correlated factors. Additionally, marital status was coded as a binary indicator, which obscures important differences among unmarried households—particularly widowed households, who face elevated burden in bivariate analysis. While the SCF provides nationally representative estimates, the cross-sectional design precludes causal inference, and unobserved factors such as credit access or regional economic conditions may influence these associations.
+
+Future work should leverage longitudinal SCF waves to examine debt burden trajectories and explore how debt composition varies across racial groups to better understand the mechanisms driving these disparities. Testing interactions between race and wealth could reveal whether disparities are concentrated at specific asset levels. Longitudinal data could track whether high debt burden predicts future wealth depletion or homeownership transitions.
+
+High debt burden undermines financial stability and mobility. Addressing these disparities requires acknowledging structural inequities, not just individual financial decisions. Ultimately, reducing high debt burden requires recognizing that financial fragility is shaped by structural forces as much as individual circumstances, demanding policy solutions that address both wealth inequality and systemic barriers.
+
+
+```{r Cache Management, include=FALSE}
+
+# Save your main data object (faster to load than rebuilding)
+saveRDS(scf_filtered, "data/scf_filtered.rds")
+
+# Clear all cache function
+clear_all_cache <- function() {
+  cache_files <- c(
+    "results/bivariate_analysis.rds",
+    "results/regression_analysis.rds",
+    "data/scf_filtered.rds"
+  )
+  
+  for(f in cache_files) {
+    if(file.exists(f)) {
+      file.remove(f)
+      # message(paste("Deleted:", f))
+    }
+  }
+  
+  # message("All cache files cleared. Re-run chunks to rebuild.")
+}
+
+# Usage: clear_all_cache()
+
+```
+
+\newpage
+
+<!-- # References -->
+
+

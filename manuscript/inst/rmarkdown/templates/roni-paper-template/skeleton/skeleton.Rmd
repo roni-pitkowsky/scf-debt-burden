@@ -1,0 +1,55 @@
+---
+title: "My Paper Title"
+subtitle: "Optional subtitle"
+author: "Roni Pitkowsky"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+
+surname: "Pitkowsky"
+runningtitle: "Short Running Title"
+
+author_dept:  "Department of Sociology"
+author_inst:  "Queens College, City University of New York"
+author_addr:  "Street Address, City, State ZIP"
+author_email: "roni.pitkowsky88@qmail.cuny.edu"
+author_web:   "https://yourwebsite.edu"
+author_orcid: "0000-0000-0000-0000"
+
+abstract: |
+  Your abstract here (150-250 words recommended).
+
+acknowledgements: |
+  Optional. Funding, data sources, etc.
+
+bibliography: references.bib
+csl: apa-6th-edition.csl
+fontpath: fonts/
+
+anonymize: false
+doublespace: false
+linenumbers: false
+numbersections: false
+maincolumns: 1
+fontset: demography
+
+output:
+  pdf_document:
+    template: jnctemplate.tex
+    latex_engine: xelatex
+    keep_tex: true
+
+header-includes:
+   - \usepackage{booktabs}
+   - \usepackage{pdflscape}
+---
+
+```{r setup, include=FALSE}
+
+rm(list=ls())
+gc()
+
+knitr::opts_knit$set(root.dir ="C:/Users/ronip/Documents")
+
+set.seed(613)
+
+```
+

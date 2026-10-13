@@ -1,0 +1,322 @@
+---
+title: "The Racialized Pathways of Household Debt Burden"
+author: "Roni Pitkowsky"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+
+snapshot: true
+snapshot_label: "Empirical Snapshot"
+snapshot_feature: "figures/presentation_race_plot.png"
+
+snapshot_byline_name: "Roni Pitkowsky"
+snapshot_byline_title: "Master’s Student of Data Analytics & Applied Social Research"
+snapshot_byline_affiliation: "Queens College, City University of New York"
+snapshot_byline_link: "https://commons.gc.cuny.edu/members/ronipitkowsky/"
+snapshot_byline_bio: "Master’s Student of Data Analytics & Applied Social Research"
+snapshot_author_image: "images/Roni_Pitkowsky_Headshot_Square.jpg"
+
+snapshot_switch_section: 3
+snapshot_license: "cc-by-nc-sa-4.0"
+snapshot_data_note:
+  - "Data: Survey of Consumer Finances <jncohen.commons.gc.cuny.edu/scf>"
+snapshot_code_url: "https://github.com/roni-pitkowsky"
+
+abstract: |
+  Raw data suggests White households face the highest rates of debt burden, but controlling for wealth reveals that racial minorities face significantly higher adjusted odds of financial distress.
+
+fontset: hfwg
+accent: 0066CC
+fontpath: fonts/
+numbersections: false
+doublespace: false
+linenumbers: false
+maincolumns: 1
+
+output:
+  hfwgtex::snapshot_pdf:
+    template: hfwgtemplate.tex
+    latex_engine: xelatex
+    keep_tex: false
+    wordpress: html
+    wordpress_assets: false
+    wordpress_checklist: false
+---
+
+```{r setup, warning = FALSE, include=FALSE}
+
+rm(list=ls())
+gc()
+
+knitr::opts_knit$set(root.dir ="C:/Users/ronip/Documents/Queens College/2026 Spring/DATA 712/scf-debt-burden")
+
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(scf)
+library(tidyverse)
+library(readxl)
+library(flextable)
+library(ggplot2)
+library(lmtest)
+library(car)
+library(survey)
+
+set.seed(613)
+
+```
+
+```{r build and load data, include=FALSE}
+
+# ============================================================
+# BUILD AND LOAD DATA
+# ============================================================
+
+# Check if cached file exists
+if(file.exists("data/scf_filtered.rds")) {
+  scf_filtered <- readRDS("data/scf_filtered.rds")
+  # message("Loaded cached SCF data.")
+  } else {
+    # STEP 1: LOAD DATA (Creates correct survey design objects)
+    year = 2022
+    scf_raw <- scf_load(year, data_directory = "data/")
+  
+    # STEP 2: UPDATE VARIABLES (Adds derived vars safely)
+    scf_filtered <- scf_update(scf_raw,
+  
+  # --- Outcome Variable ---
+  # Ensure binary 0/1 (adjust logic if your pir40 is coded differently)
+  pir40 = as.numeric(pir40 == 1), 
+  pir40_label = factor(ifelse(pir40 == 1, "High Debt Burden",
+                              "No High Debt Burden"),
+                           levels = c("No High Debt Burden",
+                                      "High Debt Burden")),
+  
+  # --- Demographics ---
+  sex = factor(case_when(
+    hhsex == 1 ~ "Male",
+    hhsex == 2 ~ "Female",
+    TRUE ~ NA_character_
+  ), levels = c("Male", "Female"), ordered = FALSE),
+  
+  age_group = factor(case_when(
+    age >= 18 & age <= 29 ~ "18-29",
+    age >= 30 & age <= 39 ~ "30-39",
+    age >= 40 & age <= 49 ~ "40-49",
+    age >= 50 & age <= 59 ~ "50-59",
+    age >= 60 & age <= 69 ~ "60-69",
+    age >= 70 ~ "70+",
+    TRUE ~ NA_character_
+  ), levels = c("18-29", "30-39", "40-49", "50-59", "60-69", "70+"), 
+     ordered = FALSE),
+  
+  race_label = factor(case_when(
+    race == 1 ~ "White non-Hispanic",
+    race == 2 ~ "Black/African American",
+    race == 3 ~ "Hispanic",
+    race == 4 ~ "Asian/Pacific Islander",
+    race == 5 ~ "Other",
+    TRUE ~ NA_character_
+  ), levels = c("White non-Hispanic", "Black/African American", 
+                "Hispanic", "Asian/Pacific Islander", "Other"), 
+     ordered = FALSE),
+  
+  # --- Family Structure ---
+  married_factor = factor(married,
+                          levels = c(1, 2),
+                          labels = c("Married", "Not Married"),
+                          ordered = FALSE),
+  
+  married_detailed = case_when(
+        x8023 == 1 ~ "Married",
+        x8023 == 2 ~ "Cohabitating",
+        x8023 == 3 ~ "Separated",
+        x8023 == 4 ~ "Divorced",
+        x8023 == 5 ~ "Widowed",
+        x8023 == 6 ~ "Never Married",
+        TRUE ~ NA_character_
+        ) %>% 
+        factor(
+          levels = c("Married", "Cohabitating", 
+                     "Separated", "Divorced", 
+                     "Widowed", "Never Married"),
+          ordered = FALSE
+          ),
+  
+  has_children = factor(kids > 0,
+                        levels = c(FALSE, TRUE),
+                        labels = c("No Children", "Has Children"),
+                        ordered = FALSE),
+  
+  # --- Socioeconomic ---
+  educ_cat = factor(case_when(
+    educ %in% -1:7 ~ "Less than High School",
+    educ == 8 ~ "High School Graduate",
+    educ == 9 ~ "Some College",
+    educ %in% 10:11 ~ "Associate's Degree",
+    educ %in% 12:14 ~ "Bachelor's Degree or Higher",
+    TRUE ~ NA_character_
+  ), levels = c("Less than High School", "High School Graduate", 
+                "Some College", "Associate's Degree", "Bachelor's Degree or Higher"), 
+     ordered = FALSE),
+  
+  wealth_group = factor(case_when(
+    nwcat == 1 ~ "Bottom 25%",
+    nwcat == 2 ~ "25–50%", 
+    nwcat == 3 ~ "50–75%",
+    nwcat == 4 ~ "75–90%",
+    nwcat == 5 ~ "Top 10%"
+  ), levels = c("Bottom 25%", "25–50%", "50–75%", "75–90%", "Top 10%"), 
+     ordered = FALSE),
+  
+  homeownership = factor(housecl,
+                         levels = c(1, 2),
+                         labels = c("Homeowner", "Renter"),
+                         ordered = FALSE)
+  )
+    saveRDS(scf_filtered, "data/scf_filtered_updated.rds")
+    # message("Created and saved cached SCF data.")
+  }
+
+# Verify variables were created
+
+c("pir40", "age", "sex", "married_factor", "married", "married_detailed", "wealth_group", "has_children", "housecl", "homeownership", "race_label", "pir40_label") %in% names(scf_filtered$mi_design[[1]]$variables)
+
+```
+
+
+While raw data suggests White households face the highest rates of debt burden, controlling for wealth and homeownership reveals that racial minorities face significantly higher odds of financial distress, highlighting structural barriers over individual deficits.
+
+Using data from the 2022 Survey of Consumer Finances (SCF), this snapshot examines the prevalence and predictors of high debt burden—defined as a Payment-to-Income Ratio (PIR) exceeding 40%. The findings reveal that high debt burden is not randomly distributed but is systematically concentrated among racial minorities and asset-poor households. Crucially, racial disparities remain significant even after extensive controls, suggesting that factors beyond individual socioeconomic status drive financial fragility.
+
+# Context
+
+Household debt in the United States has reached unprecedented levels, threatening financial stability and economic mobility. High debt service payments constrain households’ ability to weather economic shocks, exacerbating existing inequalities. Policy debates often focus on individual financial management or homeownership promotion. However, emerging scholarship on "viral debt" suggests that financial vulnerability is structurally produced, circulating through communities along pathways shaped by historical exclusion. This analysis tests whether racial and wealth disparities in debt burden persist after controlling for socioeconomic characteristics.
+
+# Findings
+
+```{r visualizations, echo=FALSE}
+# ============================================================
+# PREPARE DATA FOR RACE PLOT (Self-Contained for Snapshot)
+# ============================================================
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# 1. Load cached results if not already in the snapshot's memory
+if (!exists("race_data")) {
+  biv_cache <- readRDS("results/bivariate_analysis.rds")
+  race_data <- biv_cache$race_data
+}
+
+if (!exists("results_df")) {
+  reg_cache <- readRDS("results/regression_analysis.rds")
+  results_df <- reg_cache$results_df
+}
+
+# 2. Extract Bivariate Rates safely
+race_biv <- race_data %>%
+  select(Race = Race_Ethnicity, Bivariate_Rate = Percent_High_Burden)
+
+# 3. Extract Adjusted ORs safely (Avoid brittle row indices like 19:22)
+# We dynamically filter for the race variables by name
+race_reg <- results_df %>%
+  filter(grepl("race_label", term)) %>%
+  mutate(Race = sub("race_label", "", term)) %>%
+  select(Race, Adjusted_OR = estimate)
+
+# Add the reference group (White non-Hispanic) with an OR of 1.00
+race_or <- bind_rows(
+  data.frame(Race = "White non-Hispanic", Adjusted_OR = 1.00),
+  race_reg
+) %>%
+  mutate(Adjusted_OR = round(Adjusted_OR, 2))
+
+# 4. Merge and format for plotting
+race_comparison <- left_join(race_biv, race_or, by = "Race") %>%
+  mutate(
+    Race = factor(Race, 
+                  levels = c("White non-Hispanic", "Black/African American", 
+                             "Hispanic", "Asian/Pacific Islander", "Other"))
+  )
+
+# Reshape data for ggplot faceting
+race_plot_data <- race_comparison %>%
+  select(Race, Bivariate_Rate, Adjusted_OR) %>%
+  pivot_longer(cols = c(Bivariate_Rate, Adjusted_OR), 
+               names_to = "Measure", 
+               values_to = "Value") %>%
+  mutate(
+    Measure = case_when(
+      Measure == "Bivariate_Rate" ~ "% with High Debt Burden\n(Bivariate)",
+      Measure == "Adjusted_OR" ~ "Odds Ratio\n(Adjusted)"
+    ),
+    Race = factor(Race, 
+                  levels = c("White non-Hispanic", "Black/African American", 
+                             "Hispanic", "Asian/Pacific Islander", "Other"))
+  )
+
+# Create separate data for the reference line (ONLY for Adjusted panel)
+reference_line_data <- data.frame(
+  Measure = "Odds Ratio\n(Adjusted)",
+  yintercept = 1,
+  legend_label = "Reference (OR = 1)"
+)
+
+# ============================================================
+# CREATE THE RACE PLOT (Optimized for 1-Page Snapshot)
+# ============================================================
+race_plot <- ggplot(race_plot_data, aes(x = Race, y = Value, fill = Measure)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  geom_hline(data = reference_line_data, 
+             aes(yintercept = yintercept, linetype = legend_label),  
+             color = "#333333", linewidth = 1) +
+  scale_fill_manual(name = "", 
+                    values = c("% with High Debt Burden\n(Bivariate)" = "#0066cc",
+                               "Odds Ratio\n(Adjusted)" = "#cc3311")) +
+  scale_linetype_manual(name = "", 
+                        values = c("Reference (OR = 1)" = "dashed"),
+                        guide = guide_legend(
+                          override.aes = list(
+                            color = "#333333", 
+                            fill = NA,
+                            size = 1
+                          )
+                        )) +
+  labs(title = "Racial Disparities: Raw Rates vs. Adjusted Odds",
+       subtitle = "Left: Bivariate percentages | Right: Regression odds ratios",
+       x = "", y = "") +
+  facet_wrap(~Measure, scales = "free_y") +
+  # Slightly reduced base_size and tighter margins to ensure it fits on one page
+  theme_minimal(base_size = 11) + 
+  theme(
+    legend.position = "bottom",
+    legend.box = "horizontal",
+    legend.direction = "horizontal",
+    legend.spacing.x = unit(0.5, "cm"),
+    legend.margin = margin(t = 5),
+    legend.key.width = unit(1.2, "cm"),
+    legend.key.height = unit(0.6, "cm"),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(size = 9, color = "#333333"),
+    strip.text = element_text(face = "bold", size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9, vjust = 1),
+    legend.title = element_blank(),
+    plot.margin = margin(5, 10, 5, 5) 
+  )
+
+# Save specifically for the snapshot layout
+ggsave("visualizations/snapshot_race_plot.png", 
+       race_plot, width = 7, height = 4.5, dpi = 300, bg = "white")
+```
+
+
+The figure below depicts the divergence between raw debt burden rates and adjusted odds ratios across racial and wealth groups. Three observations stand out:
+
+**Raw Patterns Mask Structural Risk.** In bivariate analysis, White non-Hispanic households show the highest raw rate of high debt burden (11.6%), while minority groups range from 5.3% to 9.6%. Homeowners also appear more burdened (8.5%) than renters (2.8%).
+
+**Racial Disparities Emerge After Controls.** When comparing households with similar wealth, education, and family structures, the narrative flips. Asian, Hispanic, and Black households face significantly higher adjusted odds of high debt burden than White households. Compositional differences—such as White households being overrepresented in high-wealth groups—mask underlying racialized risks.
+
+**Wealth Protects, but Homeownership is a Metric Artifact.** Wealth shows a strong, monotonic protective gradient; the top 10% have 75% lower odds of high debt burden than the bottom quartile. The apparent risk associated with homeownership reflects the inclusion of mortgage payments in the debt burden metric rather than a causal effect of housing tenure.
+
+# Implication
+
+High debt burden is systematically concentrated among racial minorities and asset-poor households, independent of individual socioeconomic status. These findings challenge narratives that attribute financial distress solely to human capital deficits. Instead, debt burden operates through structural barriers—such as discriminatory lending and intergenerational wealth gaps. Policies aimed at reducing financial fragility must shift focus from broad-based homeownership promotion toward targeted interventions that build liquid assets and address systemic inequities in credit markets.
